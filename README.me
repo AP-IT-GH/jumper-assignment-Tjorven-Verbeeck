@@ -1,1 +1,83 @@
+#Beschrijving:
+Ik heb een nieuw project aangemaakt en heb hier een plane, kubus en balk aan toegeboegd. De balk was het object en de kubus was de agent. Op de agent heb ik een rigidBody toegevoegd zodat deze een massa had. Hierdoor kan de kubus terug naar beneden vallen. Ik heb ook behaviour parameters, decision requester, ray perception sensor 3d en mijn script: Cube agent jump toegevoegd. De agent heeft een blauw material gekregen en het object een geel. Ook hebben bijde een box collider gekregen. De plane heeft een zwart material gekregen.
+Volgende is mijn code:
+```
+using Unity.MLAgents.Actuators;
+using Unity.MLAgents.Sensors;
+using Unity.MLAgents;
+using UnityEngine;
 
+public class CubeAgentJump : Agent
+{
+    private Rigidbody rb;
+    public Transform obstacle;
+    private bool grounded;
+    private float obstacleSpeed;
+    private float distanceToObstacle;
+
+    public override void Initialize()
+    {
+        rb = GetComponent<Rigidbody>();
+        rb.constraints = RigidbodyConstraints.FreezeRotation | RigidbodyConstraints.FreezePositionX | RigidbodyConstraints.FreezePositionZ;
+    }
+
+    public override void OnEpisodeBegin()
+    {
+        this.transform.localPosition = new Vector3(0, 0.5f, -3); this.transform.localRotation = Quaternion.identity;
+        obstacle.transform.localPosition = new Vector3(0, 0.5f, Random.Range(4.5f, 5.5f));
+        obstacleSpeed = Random.Range(1, 3);
+        grounded = true;
+    }
+
+    public override void CollectObservations(VectorSensor sensor)
+    {
+        // Agent position
+        sensor.AddObservation(this.transform.localPosition);
+    }
+
+    public override void OnActionReceived(ActionBuffers actionBuffers)
+    {
+        AddReward(0.001f);
+
+        // Acties, size = 1
+        Vector3 controlSignal = Vector3.zero;
+        controlSignal.y = actionBuffers.ContinuousActions[0];
+
+        obstacle.transform.Translate(Vector3.back * obstacleSpeed * Time.deltaTime);
+        distanceToObstacle = Vector3.Distance(this.transform.localPosition, obstacle.localPosition);
+        grounded = Physics.Raycast(transform.position, Vector3.down, 0.55f);
+
+        if (distanceToObstacle < 1.42f)
+        {
+            SetReward(-0.5f);
+            EndEpisode();
+        }
+
+        if (this.transform.localPosition.z > obstacle.localPosition.z && distanceToObstacle > 1.42f)
+        {
+            SetReward(0.5f);
+            EndEpisode();
+        }
+
+        if (grounded && controlSignal.y>0)
+        {
+            if (distanceToObstacle > 4.0f)
+            {
+                AddReward(-0.01f);
+            }
+            rb.AddForce(0, controlSignal.y * 10.0f, 0, ForceMode.Impulse);
+        }
+    }
+
+    public override void Heuristic(in ActionBuffers actionsOut)
+    {
+        var continuousActionsOut = actionsOut.ContinuousActions;
+        continuousActionsOut[0] = Input.GetKey(KeyCode.Space) ? 1f : 0f;
+    }
+}
+```
+
+#Verloop training:
+
+De training is niet goed verlopen. Ik heb verschillende scripts en beloningen geprobeerd, maar dit is het beste resultaat dat ik heb kunnen ontvangen. De training startte bij -0.8 en eindigde rond de 0.1.
+Ik heb ook mijn yml file aangepast. Ik heb hier onder andere de hoeveelheid stappen verhoogd naar 1000000 zoals te zien is in bovenstaande afbeelding. De std-value begon laag en steeg tot ongeveer 0.5.
